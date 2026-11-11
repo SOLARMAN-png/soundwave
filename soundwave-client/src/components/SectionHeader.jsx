@@ -1,0 +1,1 @@
+export default function SectionHeader({ title, action="See all", onAction }) { return <div className="section-heading"><h2>{title}</h2>{action&&<button className="text-action" onClick={onAction}>{action}</button>}</div>; }

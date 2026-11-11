@@ -1,0 +1,3 @@
+import { AudioLines, ArrowRight } from "lucide-react";
+import Button from "../components/Button";
+export default function Welcome({ onNavigate }) { return <main className="welcome-screen"><div className="welcome-status"><span>9:41</span><span>▮ ▴ ▰</span></div><div className="welcome-brand"><AudioLines className="welcome-brand__mark" size={72} strokeWidth={3} /><h1>SoundWave</h1><p>Your Music. Your Vibe.</p></div><div className="welcome-actions"><Button onClick={() => onNavigate("Signup")}>Get Started <ArrowRight size={18} /></Button><p>Already have an account? <button onClick={() => onNavigate("Login")}>Log In</button></p></div></main>; }

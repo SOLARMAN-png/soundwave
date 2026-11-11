@@ -1,0 +1,21 @@
+# Local environment files and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and generated build output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/coverage/
+
+# Logs and local overrides
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.local
+
+# Local operating-system metadata
+.DS_Store
+Thumbs.db

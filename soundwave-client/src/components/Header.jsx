@@ -1,0 +1,2 @@
+import { ArrowLeft, MoreHorizontal } from "lucide-react";
+export default function Header({ title, onBack, action }) { return <header className="page-header">{onBack?<button className="icon-button" onClick={onBack} aria-label="Back"><ArrowLeft/></button>:<span className="page-header__spacer"/>}<h1>{title}</h1>{action||<button className="icon-button" aria-label="More options"><MoreHorizontal/></button>}</header>; }
