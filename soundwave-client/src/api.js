@@ -1,4 +1,9 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const fallbackApiUrl = import.meta.env.DEV ? "http://localhost:3000" : "";
+export const API_BASE_URL = (import.meta.env.VITE_API_URL || fallbackApiUrl || window.location.origin).replace(/\/$/, "");
+
+if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
+  console.warn("VITE_API_URL is not set. Configure the deployed backend origin in Vercel for production requests.");
+}
 
 let refreshInFlight;
 let csrfToken;
@@ -148,6 +153,54 @@ export async function getLikedTracks({ limit = 50 } = {}) {
   const params = new URLSearchParams({ limit: String(limit) });
   const result = await apiRequest(`/api/library/tracks?${params}`);
   return result.map(({ track }) => formatTrack(track));
+}
+
+export async function getPlaylists({ page = 1, limit = 50 } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  return apiRequest(`/api/playlists?${params}`);
+}
+
+export function createPlaylist(playlist) {
+  return apiRequest("/api/playlists", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(playlist),
+  });
+}
+
+export function deletePlaylist(playlistId) {
+  return apiRequest(`/api/playlists/${encodeURIComponent(playlistId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getPlaylist(id) {
+  const playlist = await apiRequest(`/api/playlists/${encodeURIComponent(id)}`);
+  return {
+    ...playlist,
+    tracks: (playlist.tracks || []).flatMap((entry) => {
+      if (!entry.trackId) return [];
+      return [{
+        ...entry,
+        track: formatTrack(entry.trackId),
+      }];
+    }),
+  };
+}
+
+export function addTrackToPlaylist(playlistId, trackId) {
+  return apiRequest(`/api/playlists/${encodeURIComponent(playlistId)}/tracks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ trackId }),
+  });
+}
+
+export function removeTrackFromPlaylist(playlistId, trackId) {
+  return apiRequest(
+    `/api/playlists/${encodeURIComponent(playlistId)}/tracks/${encodeURIComponent(trackId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function setTrackLiked(trackId, liked) {

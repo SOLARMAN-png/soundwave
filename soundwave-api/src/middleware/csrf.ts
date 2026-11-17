@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { RequestHandler } from "express";
 import { getAuthConfiguration } from "../config/auth.js";
+import { isAllowedClientOrigin } from "../config/client-origin.js";
 
 export const CSRF_COOKIE_NAME = "soundwave_csrf";
 
@@ -41,14 +42,15 @@ function constantTimeEqual(first: string, second: string) {
   return firstBuffer.length === secondBuffer.length && timingSafeEqual(firstBuffer, secondBuffer);
 }
 
-export function createCookieCsrfGuard(clientOrigin: string): RequestHandler {
+export function createCookieCsrfGuard(clientOrigins: string[]): RequestHandler {
   return (request, response, next) => {
     if (SAFE_METHODS.has(request.method)) {
       next();
       return;
     }
 
-    if (request.get("origin") !== clientOrigin) {
+    const requestOrigin = request.get("origin");
+    if (!isAllowedClientOrigin(requestOrigin, clientOrigins)) {
       response.status(403).json({
         error: "Request origin is not allowed",
         code: "ORIGIN_NOT_ALLOWED",

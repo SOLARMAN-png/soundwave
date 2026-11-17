@@ -1,27 +1,50 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Music2, Plus, Trash2 } from "lucide-react";
 import Header from "../components/Header";
 import TrackRow from "../components/TrackRow";
-import { getLikedTracks } from "../api";
-
-const items = [
-  ["Liked Songs", "liked", "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=200&q=80"],
-  ["My Playlist 1", "32 songs", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=200&q=80"],
-  ["Chill Vibes", "50 songs", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=200&q=80"],
-  ["Workout Mix", "87 songs", "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=200&q=80"],
-  ["Road Trip", "42 songs", "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=200&q=80"],
-  ["Focus Flow", "36 songs", "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=200&q=80"],
-];
+import { deletePlaylist, getLikedTracks, getPlaylists } from "../api";
 
 export default function Library({ item, onNavigate, onPlay }) {
   const [showLikedSongs, setShowLikedSongs] = useState(Boolean(item?.showLikedSongs));
   const [likedTracks, setLikedTracks] = useState(null);
   const [likedError, setLikedError] = useState("");
+  const [playlists, setPlaylists] = useState(null);
+  const [playlistsError, setPlaylistsError] = useState("");
+  const [deletingPlaylistId, setDeletingPlaylistId] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getPlaylists()
+      .then((result) => {
+        if (active) setPlaylists(result);
+      })
+      .catch((error) => {
+        if (active) setPlaylistsError(error.message || "Playlists are unavailable.");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function openLikedSongs() {
     setLikedTracks(null);
     setLikedError("");
     setShowLikedSongs(true);
+  }
+
+  async function removePlaylist(playlist) {
+    if (!window.confirm(`Delete “${playlist.name}” and remove it from your library?`)) return;
+    setPlaylistsError("");
+    setDeletingPlaylistId(playlist._id);
+    try {
+      await deletePlaylist(playlist._id);
+      setPlaylists((current) => current.filter((entry) => entry._id !== playlist._id));
+    } catch (error) {
+      setPlaylistsError(error.message || "Could not delete this playlist.");
+    } finally {
+      setDeletingPlaylistId("");
+    }
   }
 
   useEffect(() => {
@@ -67,17 +90,42 @@ export default function Library({ item, onNavigate, onPlay }) {
     <div className="page">
       <Header title="Your Library" action={<button className="icon-button" onClick={() => onNavigate("CreatePlaylist")} aria-label="Create playlist"><Plus /></button>} />
       <div className="filter-pills">{["Playlists", "Artists", "Albums", "Songs"].map((item, index) => <button key={item} className={`filter-pill ${index === 0 ? "is-selected" : ""}`}>{item}</button>)}</div>
-      <div className="library-list">{items.map(([title, subtitle, image]) => (
-        <button className="library-item" key={title} onClick={() => {
-          if (title === "Liked Songs") openLikedSongs();
-          else if (title === "Chill Vibes") onNavigate("Playlist", { title, image, subtitle });
-          else onPlay({ title, subtitle, image });
-        }}>
-          <img src={image} alt="" />
-          <span><strong>{title}</strong><small>{subtitle === "liked" ? "Liked songs" : subtitle}</small></span>
+      <div className="library-list">
+        <button className="library-item" onClick={openLikedSongs}>
+          <span className="playlist-cover playlist-cover--liked"><Music2 size={21} /></span>
+          <span><strong>Liked Songs</strong><small>Your saved tracks</small></span>
           <ChevronRight size={20} />
         </button>
-      ))}</div>
+        {playlistsError && <p className="playlist-error" role="alert">Could not load playlists: {playlistsError}</p>}
+        {playlists === null && !playlistsError && <p className="empty-state">Loading playlists...</p>}
+        {playlists?.map((playlist) => (
+          <div className="library-playlist-row" key={playlist._id}>
+            <button
+              className="library-item"
+              onClick={() => onNavigate("Playlist", playlist)}
+            >
+              {playlist.artworkUrl
+                ? <img src={playlist.artworkUrl} alt="" />
+                : <span className="playlist-cover"><Music2 size={21} /></span>}
+              <span>
+                <strong>{playlist.name}</strong>
+                <small>{playlist.trackCount} {playlist.trackCount === 1 ? "song" : "songs"} · {playlist.visibility}</small>
+              </span>
+              <ChevronRight size={20} />
+            </button>
+            <button
+              className="icon-button library-playlist-delete"
+              aria-label={`Delete ${playlist.name}`}
+              title={`Delete ${playlist.name}`}
+              disabled={Boolean(deletingPlaylistId)}
+              onClick={() => removePlaylist(playlist)}
+            >
+              <Trash2 size={17} />
+            </button>
+          </div>
+        ))}
+        {playlists?.length === 0 && <p className="empty-state">Your playlists will appear here.</p>}
+      </div>
       <button className="library-ai-link" onClick={() => onNavigate("AIPlaylistGenerator")}>✦ Try the AI Playlist Generator <ChevronRight size={18} /></button>
     </div>
   );

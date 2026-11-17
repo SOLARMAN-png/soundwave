@@ -3,6 +3,7 @@ import express, { type ErrorRequestHandler } from "express";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { pingMongoDB } from "./config/database.js";
+import { getAllowedClientOrigins, isAllowedClientOrigin } from "./config/client-origin.js";
 import { createCookieCsrfGuard } from "./middleware/csrf.js";
 import authRouter from "./features/auth/auth.routes.js";
 import adminRouter from "./features/admin/admin.routes.js";
@@ -12,22 +13,27 @@ import playbackRouter from "./features/playback/playback.routes.js";
 import playlistRouter from "./features/playlists/playlist.routes.js";
 
 const app = express();
-const clientOrigin = new URL(process.env.CLIENT_ORIGIN ?? "http://localhost:5173");
-if (clientOrigin.protocol !== "http:" && clientOrigin.protocol !== "https:") {
-  throw new Error("CLIENT_ORIGIN must use HTTP or HTTPS");
-}
-const allowedClientOrigin = clientOrigin.origin;
+const allowedClientOrigins = getAllowedClientOrigins(
+  process.env.CLIENT_ORIGINS ?? process.env.CLIENT_ORIGIN,
+);
 
 app.use(helmet());
 app.use(
   cors({
-    origin: allowedClientOrigin,
+    origin: (origin, callback) => {
+      if (!origin || isAllowedClientOrigin(origin, allowedClientOrigins)) {
+        callback(null, origin ?? true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} is not allowed`));
+    },
     credentials: true,
   }),
 );
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
-app.use("/api", createCookieCsrfGuard(allowedClientOrigin));
+app.use("/api", createCookieCsrfGuard(allowedClientOrigins));
 
 app.use("/api", catalogRouter);
 app.use("/api/auth", authRouter);

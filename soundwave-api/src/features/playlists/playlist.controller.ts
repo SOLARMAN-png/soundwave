@@ -187,6 +187,38 @@ export const updatePlaylist: RequestHandler = async (request, response) => {
   response.status(200).json({ data: playlist });
 };
 
+export const deletePlaylist: RequestHandler = async (request, response) => {
+  const id = parseId(request.params.id, response, "playlist");
+  if (!id) return;
+
+  const ownerId = currentUserId(request);
+  const playlistId = new mongoose.Types.ObjectId(id);
+  const session = await mongoose.startSession();
+  let deleted = false;
+
+  try {
+    await session.withTransaction(async () => {
+      const playlist = await PlaylistModel.findOne({ _id: playlistId, ownerId })
+        .session(session)
+        .exec();
+      if (!playlist) return;
+
+      await PlaylistTrackModel.deleteMany({ playlistId }).session(session).exec();
+      await playlist.deleteOne({ session });
+      deleted = true;
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  if (!deleted) {
+    response.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+
+  response.status(204).end();
+};
+
 export const addTrackToPlaylist: RequestHandler = async (request, response) => {
   const id = parseId(request.params.id, response, "playlist");
   if (!id) return;

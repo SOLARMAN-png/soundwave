@@ -24,7 +24,6 @@ const pagePaths = {
   Signup: "/signup",
   Home: "/home",
   Search: "/search",
-  Playlist: "/playlist",
   Artist: "/artist",
   Player: "/player",
   Library: "/library",
@@ -43,7 +42,9 @@ export default function App() {
   const [playRequest, setPlayRequest] = useState(0);
   const location = useLocation();
   const routerNavigate = useNavigate();
-  const activePage = pagesByPath[location.pathname] || "Home";
+  const activePage = location.pathname.startsWith("/playlists/")
+    ? "Playlist"
+    : pagesByPath[location.pathname] || "Home";
   const item = location.state?.item ?? null;
 
   useEffect(() => {
@@ -64,6 +65,15 @@ export default function App() {
   const navigate = (page, selected = null) => {
     if (page === "Album" && selected?._id) {
       routerNavigate(`/albums/${encodeURIComponent(selected._id)}`, { state: { item: selected } });
+      return;
+    }
+    if (page === "Playlist") {
+      const playlistId = selected?.id ?? selected?._id;
+      if (playlistId) {
+        routerNavigate(`/playlists/${encodeURIComponent(playlistId)}`, { state: { item: selected } });
+      } else {
+        routerNavigate(pagePaths.Library);
+      }
       return;
     }
     const path = pagePaths[page];
@@ -102,7 +112,13 @@ export default function App() {
   const play = (selected, options = {}) => {
     if (options.queue?.length) {
       const queueIndex = options.queue.findIndex((queuedTrack) => sameTrack(queuedTrack, selected));
-      setActiveQueue({ tracks: options.queue, index: queueIndex, name: "Liked Songs" });
+      setActiveQueue({
+        tracks: options.queue,
+        index: queueIndex,
+        name: options.queueName || "Liked Songs",
+        returnPage: options.returnPage || "Library",
+        returnItem: options.returnItem || { showLikedSongs: true },
+      });
     } else {
       setActiveQueue(null);
     }
@@ -180,9 +196,9 @@ export default function App() {
         <Route path={pagePaths.Home} element={<Home onNavigate={navigate} onPlay={play} />} />
         <Route path="/albums/:id" element={<AlbumPage onNavigate={navigate} onPlay={play} />} />
         <Route path={pagePaths.Search} element={<Search onPlay={play} />} />
-        <Route path={pagePaths.Playlist} element={<Playlist item={item} onNavigate={navigate} onPlay={play} />} />
+        <Route path="/playlists/:id" element={<Playlist item={item} onNavigate={navigate} onPlay={play} />} />
         <Route path={pagePaths.Artist} element={<Artist item={item} onNavigate={navigate} onPlay={play} />} />
-        <Route path={pagePaths.Player} element={<Player track={currentTrack} playRequest={playRequest} queueName={activeQueue?.name} canGoPrevious={activeQueue ? activeQueue.index > 0 : historyIndex > 0} canGoNext={activeQueue ? activeQueue.index >= 0 && activeQueue.index < activeQueue.tracks.length - 1 : availableTracks.some((candidate) => !sameTrack(candidate, currentTrack)) || historyIndex < playbackHistory.length - 1} onPreviousTrack={playPrevious} onNextTrack={playNext} onNavigate={activeQueue ? () => navigate("Library", { showLikedSongs: true }) : navigate} />} />
+        <Route path={pagePaths.Player} element={<Player track={currentTrack} playRequest={playRequest} queueName={activeQueue?.name} canGoPrevious={activeQueue ? activeQueue.index > 0 : historyIndex > 0} canGoNext={activeQueue ? activeQueue.index >= 0 && activeQueue.index < activeQueue.tracks.length - 1 : availableTracks.some((candidate) => !sameTrack(candidate, currentTrack)) || historyIndex < playbackHistory.length - 1} onPreviousTrack={playPrevious} onNextTrack={playNext} onNavigate={activeQueue ? () => navigate(activeQueue.returnPage, activeQueue.returnItem) : navigate} />} />
         <Route path={pagePaths.Library} element={<Library item={item} onNavigate={navigate} onPlay={play} />} />
         <Route path={pagePaths.CreatePlaylist} element={<CreatePlaylist onNavigate={navigate} />} />
         <Route path={pagePaths.AIPlaylistGenerator} element={<AIPlaylistGenerator onNavigate={navigate} />} />

@@ -32,7 +32,7 @@ Registration expects `email`, `password`, and `displayName`; `username` is optio
 
 If a confirmation email is missing, submit its address to `POST /api/auth/resend-verification`. The API returns the same `202` response whether or not a pending account exists, and the route shares the authentication rate limit.
 
-Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `EMAIL_FROM` in the ignored `.env` file. `SMTP_SECURE` defaults to `true` for port 465 and `false` otherwise. If delivery is not configured or fails, registration returns `503` and removes the pending account so the user can safely try again. Never commit SMTP credentials.
+Configure `RESEND_API_KEY` and `EMAIL_FROM` in the ignored `.env` file. `EMAIL_FROM` must use a sender address on a domain verified with Resend. In production, set `CLIENT_ORIGIN` (or `CLIENT_ORIGINS`, with the primary frontend origin first) so verification links point to the deployed client. If delivery is not configured or fails, registration returns `503` and removes the pending account so the user can safely try again. Never commit provider credentials.
 
 Auth responses include `onboardingCompleted`. New accounts are created with this value set to `false`; existing user documents without the field are treated as complete so returning users are not redirected unexpectedly. Onboarding completion should be set only after the user's preferences have been saved successfully.
 
