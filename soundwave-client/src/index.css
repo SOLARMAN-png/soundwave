@@ -285,9 +285,14 @@ textarea:focus-visible {
 }
 
 .home-added-album strong {
+  display: block;
+  width: 100%;
+  min-width: 0;
   margin-top: 9px;
+  overflow: hidden;
   font-size: 12px;
-  font-weight: 600
+  font-weight: 600;
+  text-overflow: ellipsis
 }
 
 .home-added-album span {
@@ -413,6 +418,9 @@ textarea:focus-visible {
 
 .music-card__title {
   display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin-top: 9px;
   overflow: hidden;
   font-size: 12px;
@@ -573,8 +581,11 @@ textarea:focus-visible {
 
 .mini-player__details {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 4px;
+  width: 0;
+  max-width: 100%;
   min-width: 0
 }
 
@@ -586,6 +597,9 @@ textarea:focus-visible {
 }
 
 .mini-player__details strong {
+  display: block;
+  width: 100%;
+  min-width: 0;
   font-size: 11px
 }
 
@@ -693,9 +707,11 @@ textarea:focus-visible {
 
 .track-row__info {
   display: flex;
-  flex: 1;
+  flex: 1 1 0%;
   flex-direction: column;
   gap: 5px;
+  width: 0;
+  max-width: 100%;
   min-width: 0;
   padding: 4px 0;
   border: 0;
@@ -712,6 +728,10 @@ textarea:focus-visible {
 }
 
 .track-row__info strong {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   font-size: 12px;
   font-weight: 550
 }
@@ -785,6 +805,12 @@ textarea:focus-visible {
   max-width: 34em;
   margin: 11px auto 0;
   line-height: 1.5
+}
+
+.playlist-hero .playlist-offline-note {
+  display: inline-block;
+  margin-top: 8px;
+  color: #a7d6c1
 }
 
 .playlist-actions {
@@ -869,6 +895,9 @@ textarea:focus-visible {
 }
 
 .playlist-picker-row strong {
+  display: block;
+  width: 100%;
+  min-width: 0;
   font-size: 12px
 }
 
@@ -1889,6 +1918,9 @@ textarea:focus-visible {
 }
 
 .admin-track-row__identity strong {
+  display: block;
+  width: 100%;
+  min-width: 0;
   color: #29372e;
   font-size: 11px
 }
@@ -2171,16 +2203,74 @@ textarea:focus-visible {
   min-width: 0
 }
 
-.library-playlist-delete,
-.track-row__remove {
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  color: #e58b84
+.library-playlist-options {
+  position: relative;
+  flex: 0 0 38px
 }
 
-.library-playlist-delete:disabled {
+.library-playlist-menu-trigger {
+  width: 38px;
+  height: 38px;
+  color: var(--muted)
+}
+
+.library-playlist-menu-trigger:disabled {
   opacity: .45
+}
+
+.playlist-options-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 3px);
+  right: 0;
+  display: grid;
+  width: min(230px, calc(100vw - 48px));
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #142033;
+  box-shadow: 0 12px 30px #0008
+}
+
+.playlist-options-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer
+}
+
+.playlist-options-menu button:hover,
+.playlist-options-menu button:focus-visible {
+  background: #22334b
+}
+
+.playlist-options-menu button:disabled {
+  color: var(--muted);
+  cursor: wait
+}
+
+.playlist-options-menu button.is-danger {
+  color: #f09991
+}
+
+.playlist-status {
+  margin: 12px 0;
+  color: #a7d6c1;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere
+}
+
+.track-row__remove {
+  color: #e58b84
 }
 
 .library-item {
@@ -2219,6 +2309,14 @@ textarea:focus-visible {
 .library-item small {
   color: var(--muted);
   font-size: 10px
+}
+
+.playlist-offline-badge {
+  display: inline-block;
+  margin-left: 7px;
+  color: #a7d6c1;
+  font-size: 9px;
+  font-weight: 700
 }
 
 .library-item>svg {

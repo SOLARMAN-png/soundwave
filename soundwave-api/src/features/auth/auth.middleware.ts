@@ -27,6 +27,15 @@ export const requireAuth: RequestHandler = async (request, response, next) => {
   next();
 };
 
+export const optionalAuth: RequestHandler = async (request, _response, next) => {
+  const token: unknown = request.cookies?.[ACCESS_COOKIE_NAME];
+  if (typeof token === "string") {
+    const authentication = await findAuthenticatedUser(token);
+    if (authentication) request.authenticatedUser = authentication.user;
+  }
+  next();
+};
+
 export const requireAdmin: RequestHandler = (request, response, next) => {
   const allowedEmails = new Set(
     (process.env.ADMIN_EMAILS ?? "")

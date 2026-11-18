@@ -2,6 +2,8 @@ import { Router } from "express";
 import { requireAuth } from "../auth/auth.middleware.js";
 import {
   followArtist,
+  clearLikedTracks,
+  createLikedTracksSharePlaylist,
   likeTrack,
   listFollowedArtists,
   listLikedTracks,
@@ -13,6 +15,8 @@ const libraryRouter = Router();
 
 libraryRouter.use(requireAuth);
 libraryRouter.get("/tracks", listLikedTracks);
+libraryRouter.post("/tracks/share", createLikedTracksSharePlaylist);
+libraryRouter.delete("/tracks", clearLikedTracks);
 libraryRouter.put("/tracks/:trackId", likeTrack);
 libraryRouter.delete("/tracks/:trackId", unlikeTrack);
 libraryRouter.get("/artists", listFollowedArtists);

@@ -1,3 +1,5 @@
+import { getOfflineLikedSongs, getOfflinePlaylistDetails, listOfflinePlaylists } from "./offline.js";
+
 const fallbackApiUrl = import.meta.env.DEV ? "http://localhost:3000" : "";
 export const API_BASE_URL = (import.meta.env.VITE_API_URL || fallbackApiUrl || window.location.origin).replace(/\/$/, "");
 
@@ -149,15 +151,55 @@ export async function getRecommendedTracks() {
   return result.map(formatTrack);
 }
 
-export async function getLikedTracks({ limit = 50 } = {}) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  const result = await apiRequest(`/api/library/tracks?${params}`);
-  return result.map(({ track }) => formatTrack(track));
+export async function getLikedTracks({ limit = 50, page = 1, userId } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), page: String(page) });
+  try {
+    const result = await apiRequest(`/api/library/tracks?${params}`);
+    return result.map(({ track }) => formatTrack(track));
+  } catch (error) {
+    const offlineTracks = await getOfflineLikedSongs(userId).catch(() => null);
+    if (offlineTracks) return offlineTracks.slice((page - 1) * limit, page * limit);
+    throw error;
+  }
+}
+
+export async function getAllLikedTracks({ userId } = {}) {
+  const tracks = [];
+  let page = 1;
+  let currentPage;
+  do {
+    currentPage = await getLikedTracks({ limit: 50, page, userId });
+    tracks.push(...currentPage);
+    page += 1;
+  } while (currentPage.length === 50);
+  return tracks;
+}
+
+export function clearLikedTracks() {
+  return apiRequest("/api/library/tracks", { method: "DELETE" });
+}
+
+export function createLikedTracksSharePlaylist() {
+  return apiRequest("/api/library/tracks/share", { method: "POST" });
 }
 
 export async function getPlaylists({ page = 1, limit = 50 } = {}) {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-  return apiRequest(`/api/playlists?${params}`);
+  try {
+    const result = await apiRequest(`/api/playlists?${params}`);
+    const offlinePlaylists = await listOfflinePlaylists().catch(() => []);
+    const offlineIds = new Set(offlinePlaylists.map((playlist) => playlist._id));
+    return result.map((playlist) => ({
+        ...playlist,
+        offline: offlineIds.has(playlist._id),
+      }));
+  } catch (error) {
+    const offlinePlaylists = await listOfflinePlaylists().catch(() => []);
+    if (offlinePlaylists.length) {
+      return offlinePlaylists.slice((page - 1) * limit, page * limit);
+    }
+    throw error;
+  }
 }
 
 export function createPlaylist(playlist) {
@@ -168,6 +210,14 @@ export function createPlaylist(playlist) {
   });
 }
 
+export function updatePlaylist(playlistId, changes) {
+  return apiRequest(`/api/playlists/${encodeURIComponent(playlistId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(changes),
+  });
+}
+
 export function deletePlaylist(playlistId) {
   return apiRequest(`/api/playlists/${encodeURIComponent(playlistId)}`, {
     method: "DELETE",
@@ -175,17 +225,23 @@ export function deletePlaylist(playlistId) {
 }
 
 export async function getPlaylist(id) {
-  const playlist = await apiRequest(`/api/playlists/${encodeURIComponent(id)}`);
-  return {
-    ...playlist,
-    tracks: (playlist.tracks || []).flatMap((entry) => {
-      if (!entry.trackId) return [];
-      return [{
-        ...entry,
-        track: formatTrack(entry.trackId),
-      }];
-    }),
-  };
+  try {
+    const playlist = await apiRequest(`/api/playlists/${encodeURIComponent(id)}`);
+    return {
+      ...playlist,
+      tracks: (playlist.tracks || []).flatMap((entry) => {
+        if (!entry.trackId) return [];
+        return [{
+          ...entry,
+          track: formatTrack(entry.trackId),
+        }];
+      }),
+    };
+  } catch (error) {
+    const offlinePlaylist = await getOfflinePlaylistDetails(id).catch(() => null);
+    if (offlinePlaylist) return offlinePlaylist;
+    throw error;
+  }
 }
 
 export function addTrackToPlaylist(playlistId, trackId) {

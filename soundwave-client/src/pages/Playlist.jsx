@@ -15,10 +15,11 @@ function formatDuration(seconds) {
 export default function Playlist({ onNavigate, onPlay }) {
 	const { id } = useParams();
 	const [playlist, setPlaylist] = useState(null);
-	const [loading, setLoading] = useState(true);
+	const [loadedPlaylistId, setLoadedPlaylistId] = useState("");
 	const [error, setError] = useState("");
 	const [showAddTracks, setShowAddTracks] = useState(false);
 	const [catalog, setCatalog] = useState(null);
+	const [catalogQuery, setCatalogQuery] = useState("");
 	const [catalogError, setCatalogError] = useState("");
 	const [query, setQuery] = useState("");
 	const [addingTrackId, setAddingTrackId] = useState("");
@@ -27,17 +28,17 @@ export default function Playlist({ onNavigate, onPlay }) {
 
 	useEffect(() => {
 		let active = true;
-		setLoading(true);
-		setError("");
 		getPlaylist(id)
 			.then((result) => {
-				if (active) setPlaylist(result);
+				if (!active) return;
+				setPlaylist(result);
+				setError("");
+				setLoadedPlaylistId(id);
 			})
 			.catch((requestError) => {
-				if (active) setError(requestError.message || "Could not load this playlist.");
-			})
-			.finally(() => {
-				if (active) setLoading(false);
+				if (!active) return;
+				setError(requestError.message || "Could not load this playlist.");
+				setLoadedPlaylistId(id);
 			});
 
 		return () => {
@@ -48,15 +49,17 @@ export default function Playlist({ onNavigate, onPlay }) {
 	useEffect(() => {
 		if (!showAddTracks) return undefined;
 		let active = true;
-		setCatalog(null);
-		setCatalogError("");
 		const timeout = setTimeout(() => {
 			getPublishedTracks({ query, limit: 50 })
 				.then((tracks) => {
-					if (active) setCatalog(tracks);
+					if (!active) return;
+					setCatalogQuery(query);
+					setCatalog(tracks);
 				})
 				.catch((requestError) => {
-					if (active) setCatalogError(requestError.message || "Could not load the music catalog.");
+					if (!active) return;
+					setCatalogQuery(query);
+					setCatalogError(requestError.message || "Could not load the music catalog.");
 				});
 		}, 250);
 
@@ -66,6 +69,9 @@ export default function Playlist({ onNavigate, onPlay }) {
 		};
 	}, [showAddTracks, query]);
 
+	const loading = loadedPlaylistId !== id;
+	const currentCatalog = catalogQuery === query ? catalog : null;
+	const currentCatalogError = catalogQuery === query ? catalogError : "";
 	const playlistTracks = playlist?.tracks ?? [];
 	const playlistTrackIds = new Set(playlistTracks.map(({ track }) => track._id));
 	const totalDuration = playlistTracks.reduce((total, entry) => total + (entry.track.durationSeconds || 0), 0);
@@ -130,11 +136,14 @@ export default function Playlist({ onNavigate, onPlay }) {
 				<h1>{playlist.name}</h1>
 				<span>by {creator} · {playlistTracks.length} {playlistTracks.length === 1 ? "song" : "songs"}{totalDuration ? ` · ${formatDuration(totalDuration)}` : ""}</span>
 				{playlist.description && <span className="playlist-description">{playlist.description}</span>}
+				{playlist.offline && <span className="playlist-offline-note">Available offline</span>}
 			</div>
 			<div className="playlist-actions">
-				<button className="playlist-add-button" onClick={() => setShowAddTracks((current) => !current)}>
-					<Plus size={18} /> {showAddTracks ? "Done adding" : "Add songs"}
-				</button>
+				{playlist.isOwner && !playlist.offline && (
+					<button className="playlist-add-button" onClick={() => setShowAddTracks((current) => !current)}>
+						<Plus size={18} /> {showAddTracks ? "Done adding" : "Add songs"}
+					</button>
+				)}
 				<button
 					className="round-play"
 					aria-label={`Play ${playlist.name}`}
@@ -155,9 +164,9 @@ export default function Playlist({ onNavigate, onPlay }) {
 						<SearchIcon size={17} />
 						<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search published songs" />
 					</label>
-					{catalogError && <p className="playlist-error" role="alert">{catalogError}</p>}
-					{!catalog && !catalogError && <p className="empty-state">Loading songs...</p>}
-					  {catalog && catalog.map((track) => {
+					{currentCatalogError && <p className="playlist-error" role="alert">{currentCatalogError}</p>}
+					{!currentCatalog && !currentCatalogError && <p className="empty-state">Loading songs...</p>}
+					{currentCatalog && currentCatalog.map((track) => {
 						const alreadyAdded = playlistTrackIds.has(track._id);
 						const isAdding = addingTrackId === track._id;
 						return (
@@ -176,7 +185,7 @@ export default function Playlist({ onNavigate, onPlay }) {
 							</div>
 						);
 					})}
-					  {catalog && !catalog.length && <p className="empty-state">No matching songs found.</p>}
+					{currentCatalog && !currentCatalog.length && <p className="empty-state">No matching songs found.</p>}
 				</section>
 			)}
 			<div className="playlist-track-list">
@@ -185,7 +194,7 @@ export default function Playlist({ onNavigate, onPlay }) {
 					<TrackRow
 						key={track._id}
 						track={track}
-						onRemove={removingTrackId ? undefined : removeTrack}
+						onRemove={playlist.isOwner && !playlist.offline && !removingTrackId ? removeTrack : undefined}
 						index={index + 1}
 						onPlay={(selectedTrack) => onPlay(selectedTrack, {
 							queue,

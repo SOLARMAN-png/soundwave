@@ -74,13 +74,15 @@ Track insertion, removal, and reordering use MongoDB transactions to keep track 
 
 ## Library
 
-All library routes require a signed-in user and only read or change that user's likes and follows. `PUT` operations are idempotent and return `204`; `DELETE` operations are also idempotent and return `204`. A like/follow request for an unknown catalog item returns `404`. List routes accept `page` and `limit` (default `1` and `20`, maximum `50`) and return populated track or artist details with pagination metadata.
+All library routes require a signed-in user and only read or change that user's likes and follows. `PUT` operations are idempotent and return `204`; item `DELETE` operations are also idempotent and return `204`. Clearing likes returns the number of removed likes. Sharing liked songs creates a public playlist snapshot of currently liked, published tracks with playable audio; later likes do not change that snapshot. A like/follow request for an unknown catalog item returns `404`. List routes accept `page` and `limit` (default `1` and `20`, maximum `50`) and return populated track or artist details with pagination metadata.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `PUT` | `/api/library/tracks/:trackId` | Like/save a track |
 | `DELETE` | `/api/library/tracks/:trackId` | Unlike/remove a saved track |
 | `GET` | `/api/library/tracks?page=1&limit=20` | List the current user's liked tracks |
+| `DELETE` | `/api/library/tracks` | Clear the current user's likes without deleting tracks or playlists |
+| `POST` | `/api/library/tracks/share` | Create a public playlist snapshot from the current user's playable liked tracks |
 | `PUT` | `/api/library/artists/:artistId` | Follow an artist |
 | `DELETE` | `/api/library/artists/:artistId` | Unfollow an artist |
 | `GET` | `/api/library/artists?page=1&limit=20` | List the current user's followed artists |

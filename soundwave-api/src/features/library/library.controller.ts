@@ -1,6 +1,13 @@
 import mongoose from "mongoose";
 import type { Request, RequestHandler, Response } from "express";
-import { ArtistModel, FollowModel, LikeModel, TrackModel } from "../../models/index.js";
+import {
+  ArtistModel,
+  FollowModel,
+  LikeModel,
+  PlaylistModel,
+  PlaylistTrackModel,
+  TrackModel,
+} from "../../models/index.js";
 import { libraryIdSchema, libraryListQuerySchema } from "./library.validation.js";
 
 function parseId(input: unknown, response: Response, label: string) {
@@ -75,6 +82,74 @@ export const unlikeTrack: RequestHandler = async (request, response) => {
     trackId: new mongoose.Types.ObjectId(trackId),
   }).exec();
   response.status(204).end();
+};
+
+export const clearLikedTracks: RequestHandler = async (request, response) => {
+  const result = await LikeModel.deleteMany({ userId: currentUserId(request) }).exec();
+  response.status(200).json({ data: { removed: result.deletedCount } });
+};
+
+export const createLikedTracksSharePlaylist: RequestHandler = async (request, response) => {
+  const ownerId = currentUserId(request);
+  const session = await mongoose.startSession();
+  let created: { id: string; name: string; trackCount: number } | null = null;
+
+  try {
+    await session.withTransaction(async () => {
+      const likes = await LikeModel.find({ userId: ownerId })
+        .sort({ createdAt: 1, _id: 1 })
+        .select("trackId")
+        .session(session)
+        .lean()
+        .exec();
+      const likedTrackIds = likes.map((like) => like.trackId);
+      if (!likedTrackIds.length) return;
+
+      const playableTracks = await TrackModel.find({
+        _id: { $in: likedTrackIds },
+        published: true,
+        audioUrl: { $type: "string", $ne: "" },
+      })
+        .select("_id")
+        .session(session)
+        .lean()
+        .exec();
+      const playableIds = new Set(playableTracks.map((track) => track._id.toString()));
+      const orderedIds = likedTrackIds.filter((trackId) => playableIds.has(trackId.toString()));
+      if (!orderedIds.length) return;
+
+      const displayName = request.authenticatedUser?.displayName || "A SoundWave listener";
+      const name = `${displayName}'s Liked Songs`;
+      const [playlist] = await PlaylistModel.create([{
+        ownerId,
+        name,
+        visibility: "public",
+        source: "user",
+        description: "A public snapshot of liked songs at the time it was shared.",
+      }], { session });
+      if (!playlist) throw new Error("Could not create the shared liked-songs playlist");
+
+      await PlaylistTrackModel.insertMany(
+        orderedIds.map((trackId, position) => ({
+          playlistId: playlist._id,
+          trackId,
+          position,
+          addedBy: ownerId,
+        })),
+        { session },
+      );
+      created = { id: playlist._id.toString(), name, trackCount: orderedIds.length };
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  if (!created) {
+    response.status(422).json({ error: "There are no playable liked songs to share" });
+    return;
+  }
+
+  response.status(201).json({ data: created });
 };
 
 export const listLikedTracks: RequestHandler = async (request, response) => {

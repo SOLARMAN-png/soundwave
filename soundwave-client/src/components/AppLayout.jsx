@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { BottomNav } from "./BottomNav";
 import { PlaybackContext } from "./PlaybackContext";
+import { getOfflineTrackBlob } from "../offline";
 
 export default function AppLayout({
     children,
@@ -15,6 +16,7 @@ export default function AppLayout({
 }) {
     const audioRef = useRef(null);
     const [playing, setPlaying] = useState(false);
+    const [activeAudioSource, setActiveAudioSource] = useState("");
     const [repeating, setRepeating] = useState(false);
     const [playbackProgress, setPlaybackProgress] = useState({
         key: "",
@@ -30,25 +32,51 @@ export default function AppLayout({
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
+        let active = true;
+        let objectUrl;
+        setActiveAudioSource("");
 
-        if (!currentTrack?.audioUrl) {
-            audio.pause();
-            audio.removeAttribute("src");
+        async function startTrack() {
+            let offlineBlob = null;
+            if (currentTrack?._id) {
+                try {
+                    offlineBlob = await getOfflineTrackBlob(currentTrack._id);
+                } catch {
+                    offlineBlob = null;
+                }
+            }
+            if (!active) return;
+
+            const source = offlineBlob
+                ? (objectUrl = URL.createObjectURL(offlineBlob))
+                : currentTrack?.audioUrl;
+            if (!source) {
+                audio.pause();
+                audio.removeAttribute("src");
+                audio.load();
+                return;
+            }
+
+            setPlaybackError("");
+            setActiveAudioSource(source);
+            audio.src = source;
             audio.load();
-            return;
+            audio.play().catch((error) => {
+                setPlaybackError(`Audio could not be played: ${error.message}`);
+            });
         }
 
-        audio.src = currentTrack.audioUrl;
-        audio.load();
-        audio.play().catch((error) => {
-            setPlaybackError(`Audio could not be played: ${error.message}`);
-        });
-    }, [currentTrack?.audioUrl, playRequest]);
+        void startTrack();
+        return () => {
+            active = false;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
+    }, [currentTrack?._id, currentTrack?.audioUrl, playRequest]);
 
     function togglePlayback() {
         const audio = audioRef.current;
         setPlaybackError("");
-        if (!currentTrack?.audioUrl || !audio) {
+        if (!activeAudioSource || !audio) {
             setPlaying((isPlaying) => !isPlaying);
         } else if (audio.paused) {
             audio.play().catch((error) => {
@@ -62,7 +90,7 @@ export default function AppLayout({
     function seekTo(time) {
         const boundedTime = Math.min(Math.max(time, 0), duration);
         setPlaybackProgress({ key: playbackKey, currentTime: boundedTime, duration });
-        if (audioRef.current && currentTrack?.audioUrl) audioRef.current.currentTime = boundedTime;
+        if (audioRef.current && activeAudioSource) audioRef.current.currentTime = boundedTime;
     }
 
     function handleAudioPlay() {

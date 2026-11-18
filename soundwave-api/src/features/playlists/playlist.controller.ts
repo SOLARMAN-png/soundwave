@@ -53,7 +53,7 @@ async function getPlaylistResponse(playlistId: mongoose.Types.ObjectId) {
     .select("position addedAt")
     .populate({
       path: "trackId",
-      select: "title artistIds albumId durationSeconds explicit artworkUrl previewUrl",
+      select: "title artistIds albumId durationSeconds explicit audioUrl artworkUrl previewUrl",
       populate: [
         { path: "artistIds", select: "name imageUrl" },
         { path: "albumId", select: "title artworkUrl releaseDate" },
@@ -149,16 +149,22 @@ export const getPlaylist: RequestHandler = async (request, response) => {
     return;
   }
 
+  const requesterId = request.authenticatedUser?.id;
   if (
     playlist.visibility === "private" &&
-    !playlist.ownerId.equals(currentUserId(request))
+    (typeof requesterId !== "string" || !playlist.ownerId.equals(requesterId))
   ) {
     response.status(404).json({ error: "Playlist not found" });
     return;
   }
 
   const data = await getPlaylistResponse(playlist._id);
-  response.status(200).json({ data });
+  response.status(200).json({
+    data: {
+      ...data,
+      isOwner: typeof requesterId === "string" && playlist.ownerId.equals(requesterId),
+    },
+  });
 };
 
 export const updatePlaylist: RequestHandler = async (request, response) => {
