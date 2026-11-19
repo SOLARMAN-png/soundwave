@@ -28,3 +28,10 @@ export const playbackHistoryQuerySchema = z
   .strict();
 
 export const playbackHistoryIdSchema = objectIdSchema;
+
+export const playbackMetricsSchema = z
+  .object({
+    secondsPlayed: z.number().finite().min(0).max(86_400),
+    completionPercent: z.number().finite().min(0).max(100),
+  })
+  .strict();

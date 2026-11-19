@@ -303,3 +303,18 @@ export async function recordPlayback(trackId) {
     body: JSON.stringify({ trackId }),
   });
 }
+
+export function updatePlaybackMetrics(eventId, metrics) {
+  return apiRequest(`/api/history/${encodeURIComponent(eventId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(metrics),
+  });
+}
+
+export function getListeningAnalytics({ period = "30d", granularity = "day", startDate, endDate } = {}) {
+  const params = new URLSearchParams({ period, granularity });
+  if (startDate) params.set("startDate", startDate);
+  if (endDate) params.set("endDate", endDate);
+  return apiRequest(`/api/analytics?${params}`);
+}

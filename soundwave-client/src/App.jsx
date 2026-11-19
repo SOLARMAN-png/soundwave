@@ -15,7 +15,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import Onboarding from "./pages/Onboarding";
 import VerifyEmail from "./pages/VerifyEmail";
-import { getPublishedTracks, recordPlayback } from "./api";
+import Analytics from "./pages/Analytics";
+import { getPublishedTracks, recordPlayback, updatePlaybackMetrics } from "./api";
 
 const track = { title: "Blinding Lights", artist: "The Weeknd", image: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=900&q=85" };
 const pagePaths = {
@@ -27,6 +28,7 @@ const pagePaths = {
   Artist: "/artist",
   Player: "/player",
   Library: "/library",
+  Analytics: "/analytics",
   CreatePlaylist: "/create-playlist",
   AIPlaylistGenerator: "/ai-playlist-generator",
 };
@@ -40,6 +42,7 @@ export default function App() {
   const [activeQueue, setActiveQueue] = useState(null);
   const [hasActiveTrack, setHasActiveTrack] = useState(false);
   const [playRequest, setPlayRequest] = useState(0);
+  const [shuffled, setShuffled] = useState(false);
   const location = useLocation();
   const routerNavigate = useNavigate();
   const activePage = location.pathname.startsWith("/playlists/")
@@ -140,14 +143,26 @@ export default function App() {
   const playNext = (shuffle = false) => {
     if (activeQueue) {
       const { tracks, index } = activeQueue;
-      if (index < 0 || index >= tracks.length - 1) return;
-
+      const candidates = shuffle
+        ? tracks
+            .map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
+            .filter(({ candidate }) => !sameTrack(candidate, currentTrack))
+        : [];
+      if (shuffle && !candidates.length) return;
       const nextIndex = shuffle
-        ? index + 1 + Math.floor(Math.random() * (tracks.length - index - 1))
+        ? candidates[Math.floor(Math.random() * candidates.length)].candidateIndex
         : index + 1;
+      if (nextIndex < 0 || nextIndex >= tracks.length) return;
       setActiveQueue({ ...activeQueue, index: nextIndex });
       selectTrack(tracks[nextIndex]);
       return;
+    }
+    if (shuffle) {
+      const candidates = availableTracks.filter((candidate) => !sameTrack(candidate, currentTrack));
+      if (candidates.length) {
+        selectTrack(candidates[Math.floor(Math.random() * candidates.length)]);
+        return;
+      }
     }
     if (historyIndex < playbackHistory.length - 1) {
       const nextIndex = historyIndex + 1;
@@ -164,10 +179,15 @@ export default function App() {
       nextTrack = candidates[Math.floor(Math.random() * candidates.length)];
     } else {
       const currentIndex = availableTracks.findIndex((candidate) => sameTrack(candidate, currentTrack));
-      nextTrack = availableTracks[(currentIndex + 1 + availableTracks.length) % availableTracks.length];
+      nextTrack = availableTracks[(Math.max(currentIndex, -1) + 1) % availableTracks.length];
     }
     selectTrack(nextTrack);
   };
+  const canGoNext = activeQueue
+    ? shuffled
+      ? activeQueue.tracks.some((candidate) => !sameTrack(candidate, currentTrack))
+      : activeQueue.index >= 0 && activeQueue.index < activeQueue.tracks.length - 1
+    : availableTracks.some((candidate) => !sameTrack(candidate, currentTrack)) || historyIndex < playbackHistory.length - 1;
 
   return (
     <Routes>
@@ -186,7 +206,8 @@ export default function App() {
             hasActiveTrack={hasActiveTrack}
             playRequest={playRequest}
             onPlaybackStart={(playedTrack) => recordPlayback(playedTrack._id)}
-            onTrackEnded={() => playNext(false)}
+            onPlaybackProgress={updatePlaybackMetrics}
+            onTrackEnded={() => playNext(shuffled)}
           >
             <Outlet />
           </AppLayout>
@@ -198,8 +219,9 @@ export default function App() {
         <Route path={pagePaths.Search} element={<Search onPlay={play} />} />
         <Route path="/playlists/:id" element={<Playlist item={item} onNavigate={navigate} onPlay={play} />} />
         <Route path={pagePaths.Artist} element={<Artist item={item} onNavigate={navigate} onPlay={play} />} />
-        <Route path={pagePaths.Player} element={<Player track={currentTrack} playRequest={playRequest} queueName={activeQueue?.name} canGoPrevious={activeQueue ? activeQueue.index > 0 : historyIndex > 0} canGoNext={activeQueue ? activeQueue.index >= 0 && activeQueue.index < activeQueue.tracks.length - 1 : availableTracks.some((candidate) => !sameTrack(candidate, currentTrack)) || historyIndex < playbackHistory.length - 1} onPreviousTrack={playPrevious} onNextTrack={playNext} onNavigate={activeQueue ? () => navigate(activeQueue.returnPage, activeQueue.returnItem) : navigate} />} />
+        <Route path={pagePaths.Player} element={<Player track={currentTrack} playRequest={playRequest} queueName={activeQueue?.name} shuffled={shuffled} onShuffleChange={() => setShuffled((current) => !current)} canGoPrevious={activeQueue ? activeQueue.index > 0 : historyIndex > 0} canGoNext={canGoNext} onPreviousTrack={playPrevious} onNextTrack={playNext} onNavigate={activeQueue ? () => navigate(activeQueue.returnPage, activeQueue.returnItem) : navigate} />} />
         <Route path={pagePaths.Library} element={<Library item={item} onNavigate={navigate} onPlay={play} />} />
+        <Route path={pagePaths.Analytics} element={<Analytics onNavigate={navigate} onPlay={play} />} />
         <Route path={pagePaths.CreatePlaylist} element={<CreatePlaylist onNavigate={navigate} />} />
         <Route path={pagePaths.AIPlaylistGenerator} element={<AIPlaylistGenerator onNavigate={navigate} />} />
       </Route>

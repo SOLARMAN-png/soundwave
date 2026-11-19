@@ -5,6 +5,7 @@ import {
   playbackEventSchema,
   playbackHistoryIdSchema,
   playbackHistoryQuerySchema,
+  playbackMetricsSchema,
 } from "./playback.validation.js";
 
 function currentUserId(request: Request) {
@@ -137,4 +138,38 @@ export const deletePlaybackHistoryEntry: RequestHandler = async (request, respon
   }
 
   response.status(204).end();
+};
+
+export const updatePlaybackHistoryEntry: RequestHandler = async (request, response) => {
+  const parsedId = playbackHistoryIdSchema.safeParse(request.params.id);
+  if (!parsedId.success) {
+    response.status(400).json({ error: "Invalid history entry ID" });
+    return;
+  }
+  const parsedMetrics = playbackMetricsSchema.safeParse(request.body);
+  if (!parsedMetrics.success) {
+    response.status(400).json({
+      error: "Invalid playback metrics",
+      details: parsedMetrics.error.issues.map(({ path, message }) => ({ path, message })),
+    });
+    return;
+  }
+
+  const event = await PlaybackEventModel.findOneAndUpdate(
+    { _id: parsedId.data, userId: currentUserId(request) },
+    { $max: parsedMetrics.data },
+    { new: true },
+  ).select("_id secondsPlayed completionPercent").lean().exec();
+  if (!event) {
+    response.status(404).json({ error: "History entry not found" });
+    return;
+  }
+
+  response.status(200).json({
+    data: {
+      id: event._id.toString(),
+      secondsPlayed: event.secondsPlayed,
+      completionPercent: event.completionPercent,
+    },
+  });
 };

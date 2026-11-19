@@ -20,6 +20,7 @@ The app uses React Router with browser-history URLs. The page routes are:
 | Artist | `/artist` |
 | Player | `/player` |
 | Library | `/library` |
+| Analytics | `/analytics` |
 | Create Playlist | `/create-playlist` |
 | AI Playlist Generator | `/ai-playlist-generator` |
 

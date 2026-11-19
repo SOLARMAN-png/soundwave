@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { BottomNav } from "./BottomNav";
 import { PlaybackContext } from "./PlaybackContext";
@@ -12,9 +12,14 @@ export default function AppLayout({
     hasActiveTrack,
     playRequest,
     onPlaybackStart,
+    onPlaybackProgress,
     onTrackEnded,
 }) {
     const audioRef = useRef(null);
+    const playbackEventRef = useRef(null);
+    const playbackSessionKeyRef = useRef("");
+    const listenedSecondsRef = useRef(0);
+    const previousAudioTimeRef = useRef(null);
     const [playing, setPlaying] = useState(false);
     const [activeAudioSource, setActiveAudioSource] = useState("");
     const [repeating, setRepeating] = useState(false);
@@ -28,6 +33,21 @@ export default function AppLayout({
     const playbackKey = `${currentTrack?._id || currentTrack?.audioUrl || currentTrack?.title}:${playRequest}`;
     const currentTime = playbackProgress.key === playbackKey ? playbackProgress.currentTime : 0;
     const duration = playbackProgress.key === playbackKey ? playbackProgress.duration : 200;
+
+    const savePlaybackMetrics = useCallback(() => {
+        const eventId = playbackEventRef.current;
+        if (!eventId || !onPlaybackProgress) return;
+        const audio = audioRef.current;
+        const completionPercent = audio && Number.isFinite(audio.duration) && audio.duration > 0
+            ? Math.min(100, (audio.currentTime / audio.duration) * 100)
+            : 0;
+        onPlaybackProgress(eventId, {
+            secondsPlayed: listenedSecondsRef.current,
+            completionPercent,
+        }).catch((error) => {
+            setHistoryError(`Could not update listening history: ${error.message}`);
+        });
+    }, [onPlaybackProgress]);
 
     useEffect(() => {
         const audio = audioRef.current;
@@ -70,8 +90,13 @@ export default function AppLayout({
         return () => {
             active = false;
             if (objectUrl) URL.revokeObjectURL(objectUrl);
+            savePlaybackMetrics();
+            playbackEventRef.current = null;
+            playbackSessionKeyRef.current = "";
+            listenedSecondsRef.current = 0;
+            previousAudioTimeRef.current = null;
         };
-    }, [currentTrack?._id, currentTrack?.audioUrl, playRequest]);
+    }, [currentTrack?._id, currentTrack?.audioUrl, playRequest, savePlaybackMetrics]);
 
     function togglePlayback() {
         const audio = audioRef.current;
@@ -95,12 +120,25 @@ export default function AppLayout({
 
     function handleAudioPlay() {
         setPlaying(true);
-        if (!currentTrack?._id || !onPlaybackStart) return;
+        const sessionKey = playbackKey;
+        previousAudioTimeRef.current = audioRef.current?.currentTime ?? null;
+        if (
+            !currentTrack?._id ||
+            !onPlaybackStart ||
+            playbackSessionKeyRef.current === sessionKey
+        ) return;
 
+        playbackSessionKeyRef.current = sessionKey;
         setHistoryError("");
-        onPlaybackStart(currentTrack).catch((error) => {
-            setHistoryError(`Could not save listening history: ${error.message}`);
-        });
+        onPlaybackStart(currentTrack)
+            .then((event) => {
+                if (playbackSessionKeyRef.current !== sessionKey) return;
+                playbackEventRef.current = event.id;
+                if (listenedSecondsRef.current > 0) savePlaybackMetrics();
+            })
+            .catch((error) => {
+                setHistoryError(`Could not save listening history: ${error.message}`);
+            });
     }
 
     const playback = {
@@ -115,6 +153,12 @@ export default function AppLayout({
         setRepeating,
     };
 
+    useEffect(() => {
+        if (!playing) return undefined;
+        const interval = window.setInterval(savePlaybackMetrics, 15_000);
+        return () => window.clearInterval(interval);
+    }, [playing, savePlaybackMetrics]);
+
     return (
         <main className="app-shell">
             <PlaybackContext.Provider value={playback}>
@@ -124,12 +168,25 @@ export default function AppLayout({
                     preload="metadata"
                     loop={repeating}
                     onPlay={handleAudioPlay}
-                    onPause={() => setPlaying(false)}
-                    onTimeUpdate={(event) => setPlaybackProgress({
-                        key: playbackKey,
-                        currentTime: event.currentTarget.currentTime,
-                        duration,
-                    })}
+                    onTimeUpdate={(event) => {
+                        const audio = event.currentTarget;
+                        const previousTime = previousAudioTimeRef.current;
+                        if (previousTime !== null) {
+                            const elapsed = audio.currentTime - previousTime;
+                            if (elapsed > 0 && elapsed <= 2.5) listenedSecondsRef.current += elapsed;
+                        }
+                        previousAudioTimeRef.current = audio.currentTime;
+                        setPlaybackProgress({
+                            key: playbackKey,
+                            currentTime: audio.currentTime,
+                            duration,
+                        });
+                    }}
+                    onPause={() => {
+                        setPlaying(false);
+                        savePlaybackMetrics();
+                        previousAudioTimeRef.current = null;
+                    }}
                     onLoadedMetadata={(event) => {
                         const audioDuration = event.currentTarget.duration;
                         if (Number.isFinite(audioDuration)) {
@@ -138,6 +195,7 @@ export default function AppLayout({
                     }}
                     onEnded={() => {
                         setPlaying(false);
+                        savePlaybackMetrics();
                         onTrackEnded();
                     }}
                 />

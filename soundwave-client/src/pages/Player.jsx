@@ -6,6 +6,7 @@ import {
   Pause,
   Play,
   Repeat,
+  Repeat1,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -24,6 +25,8 @@ function formatTime(seconds) {
 export default function Player({
   track,
   queueName,
+  shuffled,
+  onShuffleChange,
   canGoPrevious,
   canGoNext,
   onPreviousTrack,
@@ -32,7 +35,6 @@ export default function Player({
 }) {
   const [likedTrackId, setLikedTrackId] = useState(null);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [shuffled, setShuffled] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
   const {
     playing,
@@ -118,11 +120,11 @@ export default function Player({
       {playbackError && <p className="admin-alert" role="alert">{playbackError}</p>}
       {historyError && <p className="admin-alert" role="alert">{historyError}</p>}
       <div className="player-controls">
-        <button className={`icon-button ${shuffled ? "is-active" : ""}`} onClick={() => setShuffled(!shuffled)} aria-label="Shuffle" aria-pressed={shuffled}><Shuffle /></button>
+        <button className={`icon-button ${shuffled ? "is-active" : ""}`} onClick={onShuffleChange} aria-label="Shuffle" aria-pressed={shuffled}><Shuffle /></button>
         <button className="icon-button" onClick={onPreviousTrack} disabled={!canGoPrevious} aria-label="Play previous song"><SkipBack /></button>
         <button className="main-play" onClick={togglePlayback} aria-label={playing ? "Pause" : "Play"}>{playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}</button>
         <button className="icon-button" onClick={() => onNextTrack(shuffled)} disabled={!canGoNext} aria-label="Play next song"><SkipForward /></button>
-        <button className={`icon-button ${repeating ? "is-active" : ""}`} onClick={handleRepeat} aria-label="Repeat" aria-pressed={repeating}><Repeat /></button>
+        <button className={`icon-button ${repeating ? "is-active" : ""}`} onClick={handleRepeat} aria-label={repeating ? "Repeat one" : "Repeat"} aria-pressed={repeating}>{repeating ? <Repeat1 /> : <Repeat />}</button>
       </div>
       <div className="player-footer">
         <button className="icon-button" aria-label="Devices"><Speaker /></button>

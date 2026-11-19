@@ -10,6 +10,7 @@ import adminRouter from "./features/admin/admin.routes.js";
 import catalogRouter from "./features/catalog/catalog.routes.js";
 import libraryRouter from "./features/library/library.routes.js";
 import playbackRouter from "./features/playback/playback.routes.js";
+import analyticsRouter from "./features/analytics/analytics.routes.js";
 import playlistRouter from "./features/playlists/playlist.routes.js";
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/playlists", playlistRouter);
 app.use("/api/library", libraryRouter);
 app.use("/api/history", playbackRouter);
+app.use("/api/analytics", analyticsRouter);
 
 app.get("/api/v1/health", (_request, response) => {
   response.status(200).json({ status: "ok" });

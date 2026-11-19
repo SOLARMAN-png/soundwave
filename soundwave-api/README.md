@@ -91,15 +91,28 @@ Unique compound indexes on `(userId, trackId)` and `(userId, artistId)` prevent 
 
 ## Playback history
 
-Playback history records listening events only; it does not stream or serve audio. All history routes require a signed-in user, and users can only retrieve or delete their own events. Each `POST` creates a new event, including repeat plays. `playedAt` is set by the API; clients cannot backdate events. Track details are populated in responses. List routes accept `page` and `limit` (default `1` and `20`, maximum `50`) and return newest events first with pagination metadata.
+Playback history records listening events only; it does not stream or serve audio. All history routes require a signed-in user, and users can only retrieve, update, or delete their own events. Each `POST` creates a new event, including repeat plays. `playedAt` is set by the API; clients cannot backdate events. Track details are populated in responses. List routes accept `page` and `limit` (default `1` and `20`, maximum `50`) and return newest events first with pagination metadata.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/api/history` | Record a play event |
 | `GET` | `/api/history?page=1&limit=20` | List the current user's recent plays |
+| `PATCH` | `/api/history/:id` | Update the current user's listening metrics for a play |
 | `DELETE` | `/api/history/:id` | Delete one of the current user's history entries |
 
 The record body requires `trackId`. Optional fields are `secondsPlayed` (0–86,400), `completionPercent` (0–100), and the paired `contextType`/`contextId` fields. Context types are `playlist`, `album`, `artist`, `search`, and `ai`. Invalid input returns `400`; an unknown track returns `404`.
+
+The metrics update body requires `secondsPlayed` and `completionPercent`. Users can update only their own history entries; each metric is stored monotonically so delayed updates cannot reduce recorded listening.
+
+## Listening analytics
+
+`GET /api/analytics` returns listening statistics, ranked tracks/albums/artists/genres, activity buckets, and insights for the authenticated user. All values are derived only from that user's playback history.
+
+| Query | Values | Default |
+| --- | --- | --- |
+| `period` | `7d`, `30d`, `3m`, `6m`, `12m`, `all`, `custom` | `30d` |
+| `granularity` | `day`, `week`, `month` | `day` |
+| `startDate`, `endDate` | `YYYY-MM-DD`; required together for `custom`, inclusive | — |
 
 ## Admin catalog uploads
 
